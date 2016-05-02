@@ -33,12 +33,11 @@ public class WorkflowEngineConfiguration{
     private String clusterMulticastGroup;
     @Value("${workflowengine.cluster.multicast.port}")
     private String clusterMulticastPortText;
-    private int clusterMulticastPort;
     @Value("${workflowengine.cluster.multicast.ttl}")
     private String clusterMulticastTtlText;
-    private int clusterMulticastTtl;
     @Value("${workflowengine.node.name}")
     private String nodeName;
+    private String hostName;
     @Value("${workflowengine.heartbeat.intervalSeconds}")
     private int heartbeatInterval;
     @Value("${workflowengine.heartbeat.maximumPauseSeconds}")
@@ -57,26 +56,19 @@ public class WorkflowEngineConfiguration{
     private String consoleMappingPrefix;
     @Value("${workflowengine.environment}")
     private String environment;
+    @Value("${workflowengine.embeddedNavigationMode:false}")
+    private boolean embeddedNavigationMode;
 
     @PostConstruct
     public void init(){
-        if (StringUtils.isNotBlank(schema)) {
-            schema += ".";
-        }
-        else {
-            schema = "";
-        }
-        clusterMulticastGroup = getFirstNotEmpty( clusterMulticastGroup, DEFAULT_CLUSTER_MULTICAST_GROUP );
-        clusterMulticastPort = getFirstNotEmpty( clusterMulticastPortText, DEFAULT_CLUSTER_MULTICAST_PORT );
-        clusterMulticastTtl = getFirstNotEmpty( clusterMulticastTtlText, DEFAULT_CLUSTER_MULTICAST_TTL );
-        nodeName = getFirstNotEmptyNodeName( nodeName );
+        hostName = getHostName();
     }
 
     /**
      * Returns the PostgreSQL schema name + "." for workflow engine tables or an empty string if not configured. Used for constructing SQL queries.
      */
     public String getSchema() {
-        return schema;
+        return StringUtils.isNotBlank(schema) ? (schema + ".") : "";
     }
 
     /**
@@ -94,7 +86,7 @@ public class WorkflowEngineConfiguration{
      * and defaults to Hacelcasts multicast group default "224.2.2.3".
      */
     public String getClusterMulticastGroup(){
-        return clusterMulticastGroup;
+        return StringUtils.isNotBlank(clusterMulticastGroup) ? clusterMulticastGroup : DEFAULT_CLUSTER_MULTICAST_GROUP;
     }
 
     /**
@@ -102,7 +94,7 @@ public class WorkflowEngineConfiguration{
      * and defaults to Hacelcasts multicast port default 54327.
      */
     public int getClusterMulticastPort(){
-        return clusterMulticastPort;
+        return StringUtils.isNotBlank( clusterMulticastPortText ) ? Integer.valueOf( clusterMulticastPortText ) : DEFAULT_CLUSTER_MULTICAST_PORT;
     }
 
     /**
@@ -111,7 +103,7 @@ public class WorkflowEngineConfiguration{
      * to the same host.
      */
     public int getClusterMulticastTtl(){
-        return clusterMulticastTtl;
+        return StringUtils.isNotBlank( clusterMulticastTtlText ) ? Integer.valueOf( clusterMulticastTtlText ) : DEFAULT_CLUSTER_MULTICAST_TTL;
     }
 
     /**
@@ -119,7 +111,7 @@ public class WorkflowEngineConfiguration{
      * currently executing a workflow instance.
      */
     public String getNodeName(){
-        return nodeName;
+        return StringUtils.isNotBlank(nodeName) ? nodeName : hostName;
     }
 
     /**
@@ -181,7 +173,7 @@ public class WorkflowEngineConfiguration{
     }
 
     /**
-     * Determines wether the engine is deployed in development mode (as opposed to production).
+     * Determines whether the engine is deployed in development mode (as opposed to production).
      */
     public boolean isDevelopmentMode(){
         return developmentMode;
@@ -198,16 +190,11 @@ public class WorkflowEngineConfiguration{
         return environment;
     }
 
-    private String getFirstNotEmpty( String configValue, String defaultValue ){
-        return StringUtils.isNotBlank( configValue ) ? configValue : defaultValue;
-    }
-
-    private int getFirstNotEmpty( String configValue, int defaultValue ){
-        return StringUtils.isNotBlank( configValue ) ? Integer.valueOf( configValue ) : defaultValue;
-    }
-
-    private String getFirstNotEmptyNodeName( String configValue ){
-        return StringUtils.isNotBlank( configValue ) ? configValue : getHostName();
+    /**
+     * Determines if the header logo and navigation links act as a stand-alone web app (default), or as embedded web screens.
+     */
+    public boolean isEmbeddedNavigationMode() {
+		return embeddedNavigationMode;
     }
 
     private static String getHostName(){

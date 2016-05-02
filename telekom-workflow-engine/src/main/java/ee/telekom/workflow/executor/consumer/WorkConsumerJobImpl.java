@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import ee.telekom.workflow.core.common.WorkflowEngineConfiguration;
+import ee.telekom.workflow.core.notification.ExceptionNotificationService;
 import ee.telekom.workflow.util.ExecutorServiceUtil;
 import ee.telekom.workflow.util.NamedPoolThreadFactory;
 
@@ -23,17 +24,23 @@ public class WorkConsumerJobImpl implements WorkConsumerJob{
     private WorkConsumerService workConsumerService;
     @Autowired
     private WorkflowEngineConfiguration config;
+    @Autowired
+    private ExceptionNotificationService exceptionNotificationService;
 
-    private ExecutorService threadPool;
+    private ExecutorService executorService;
     private final AtomicBoolean isStopping = new AtomicBoolean();
 
     @Override
     public synchronized void start(){
         isStopping.set( false );
+
+        // number of parallel consumer threads
         int numberOfConsumerThreads = config.getNumberOfConsumerThreads();
-        threadPool = Executors.newFixedThreadPool( numberOfConsumerThreads, new NamedPoolThreadFactory( "consumer" ) );
+        executorService = Executors.newFixedThreadPool( numberOfConsumerThreads, new NamedPoolThreadFactory( "consumer" ) );
+
+        // start the consuming jobs
         for( int i = 0; i < numberOfConsumerThreads; i++ ){
-            threadPool.execute( new ConsumerRunnable() );
+            executorService.execute( new ConsumerRunnable() );
         }
         log.info( "Scheduled {} consumers", numberOfConsumerThreads );
     }
@@ -42,7 +49,7 @@ public class WorkConsumerJobImpl implements WorkConsumerJob{
     public synchronized void stop(){
         log.debug( "Stopping consumers" );
         isStopping.set( true );
-        ExecutorServiceUtil.shutDownSynchronously( threadPool );
+        ExecutorServiceUtil.shutDownSynchronously( executorService );
         log.info( "Stopped all consumers" );
     }
 
@@ -57,6 +64,7 @@ public class WorkConsumerJobImpl implements WorkConsumerJob{
                     }
                     catch( Exception e ){
                         log.error( "ConsumerRunnable failed to consume work, but we will try again after 10 seconds.", e );
+                        exceptionNotificationService.handleException( e );
                         try{
                             Thread.sleep( 1000L * 10 );
                         }

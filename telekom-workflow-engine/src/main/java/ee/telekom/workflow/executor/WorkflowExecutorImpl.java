@@ -15,6 +15,7 @@ import org.springframework.transaction.support.DefaultTransactionDefinition;
 
 import ee.telekom.workflow.core.archive.ArchiveService;
 import ee.telekom.workflow.core.common.UnexpectedStatusException;
+import ee.telekom.workflow.core.notification.ExceptionNotificationService;
 import ee.telekom.workflow.core.workflowinstance.WorkflowInstance;
 import ee.telekom.workflow.core.workflowinstance.WorkflowInstanceService;
 import ee.telekom.workflow.core.workflowinstance.WorkflowInstanceStatus;
@@ -50,6 +51,8 @@ public class WorkflowExecutorImpl implements WorkflowExecutor{
     private WorkflowEnginePlugin plugin;
     @Autowired
     private PlatformTransactionManager platformTransactionManager;
+    @Autowired
+    private ExceptionNotificationService exceptionNotificationService;
 
     /*
      * A few words on the treatment of UnexpectedStatusException's.
@@ -94,8 +97,9 @@ public class WorkflowExecutorImpl implements WorkflowExecutor{
                 workflowInstanceService.handleStartingError( woinRefNum, e );
             }
             catch( Exception e2 ){
-                log.warn( "Handling error failed.", e2 );
+                log.error( "Handling error failed.", e2 );
             }
+            exceptionNotificationService.handleException( e );
         }
     }
 
@@ -155,8 +159,9 @@ public class WorkflowExecutorImpl implements WorkflowExecutor{
                 workflowInstanceService.handleAbortingError( woinRefNum, e );
             }
             catch( Exception e2 ){
-                log.warn( "Handling error failed.", e2 );
+                log.error( "Handling error failed.", e2 );
             }
+            exceptionNotificationService.handleException( e );
         }
     }
 
@@ -166,6 +171,7 @@ public class WorkflowExecutorImpl implements WorkflowExecutor{
 
         TransactionStatus status = null;
         try{
+            workflowInstanceService.assertIsExecuting(woinRefNum);
             workItemService.markCompleting( woitRefNum );
             status = begin();
 
@@ -193,8 +199,9 @@ public class WorkflowExecutorImpl implements WorkflowExecutor{
                 workItemService.handleCompletingError( woinRefNum, woitRefNum, e );
             }
             catch( Exception e2 ){
-                log.warn( "Handling error failed.", e2 );
+                log.error( "Handling error failed.", e2 );
             }
+            exceptionNotificationService.handleException( e );
         }
     }
 
@@ -204,6 +211,7 @@ public class WorkflowExecutorImpl implements WorkflowExecutor{
 
         TransactionStatus status = null;
         try{
+            workflowInstanceService.assertIsExecuting(woinRefNum);
             workItemService.markExecuting( woitRefNum );
             status = begin();
 
@@ -232,8 +240,9 @@ public class WorkflowExecutorImpl implements WorkflowExecutor{
                 workItemService.handleExecutingError( woinRefNum, woitRefNum, e );
             }
             catch( Exception e2 ){
-                log.warn( "Handling error failed.", e2 );
+                log.error( "Handling error failed.", e2 );
             }
+            exceptionNotificationService.handleException( e );
         }
     }
 
@@ -250,8 +259,13 @@ public class WorkflowExecutorImpl implements WorkflowExecutor{
     private void rollback( TransactionStatus status ){
         if( status != null ){
             log.info( "Trying to roll back" );
+            try{
             platformTransactionManager.rollback( status );
             log.info( "Rolled back" );
+        }
+            catch( Exception e ){
+                log.error( "Failed to roll back transaction", e );
+            }
         }
         else{
             log.warn( "Cannot roll back, because transaction status is null" );

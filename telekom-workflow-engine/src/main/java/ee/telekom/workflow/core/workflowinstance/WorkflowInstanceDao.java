@@ -35,7 +35,14 @@ public class WorkflowInstanceDao extends AbstractWorkflowEngineDao{
         return results.isEmpty() ? null : results.get( 0 );
     }
 
-    public void updateAndUnlock( long refNum,
+    public WorkflowInstanceStatus findStatusByRefNum( long refNum ){
+        String sql = "SELECT status FROM " + getSchema() + "workflow_instances WHERE ref_num = ?";
+        Object[] args = {refNum};
+        List<String> results = getJdbcTemplate().queryForList( sql, args, String.class );
+        return results.isEmpty() ? null : WorkflowInstanceStatus.valueOf(results.get( 0 ) );
+    }
+
+    public boolean updateAndUnlock( long refNum,
                                  int workflowVersion,
                                  String attributes,
                                  String history,
@@ -67,7 +74,8 @@ public class WorkflowInstanceDao extends AbstractWorkflowEngineDao{
                 .addValue( "dateUpdated", new Date() )
                 .addValue( "lastUpdatedBy", getCreatedOrLastUpdatedBy() )
                 .addValue( "expectedStatuses", expectedStatuses );
-        getNamedParameterJdbcTemplate().update( sql, source );
+        int count = getNamedParameterJdbcTemplate().update( sql, source );
+        return (count == 1);
     }
 
     public boolean updateStatus( long refNum, WorkflowInstanceStatus newStatus, Collection<WorkflowInstanceStatus> expectedStatuses ){
